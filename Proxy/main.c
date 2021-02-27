@@ -31,21 +31,31 @@
 #include "assert_util.h"
 #include "proxy.h"
 
+BOOLEAN using_bepinex = FALSE;
+int ignored_mods_len;
+wchar_t ignored_mods[MAX_PATH * 64];
+
+int get_ignored_mods(const wchar_t *a1, wchar_t* a2) {
+    lstrcpyW(a2, L"0Harmony.dll");
+    lstrcpyW(a2 + MAX_PATH, L"Vale-UI-Library.dll");
+    return 2;
+}
+
+BOOLEAN check_ignored(const wchar_t* file_name, const wchar_t* ignored_mods, int len) {
+    for (int i = 0; i < len; i++) {
+        if (!lstrcmpiW(&ignored_mods[MAX_PATH * i], file_name)) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 // The hook for mono_jit_init_version
 // We use this since it will always be called once to initialize Mono's JIT
 void doorstop_invoke(void *domain) {
-    VERBOSE_ONLY({
-        HANDLE stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-        LOG("STDOUT handle at %p\n", stdout);
-        char handlepath[2046] = "\0";
-        GetFinalPathNameByHandleA(stdout, handlepath, 2046, 0);
-        LOG("STDOUT handle path: %s\n", handlepath);
-        });
-
-
+    size_t mods_loaded = 0;
     if (!config.ignore_disabled_env && GetEnvironmentVariableW(L"DOORSTOP_INITIALIZED", NULL, 0) != 0) {
         LOG("DOORSTOP_INITIALIZED is set! Skipping!");
-        cleanup_config();
         free_logger();
         return;
     }
@@ -76,8 +86,7 @@ void doorstop_invoke(void *domain) {
 #undef CONFIG_EXT
     }
 
-    // Set target assembly as an environment variable for use in the managed world
-    SetEnvironmentVariableW(L"DOORSTOP_INVOKE_DLL_PATH", config.target_assembly);
+    ignored_mods_len = get_ignored_mods(L"0Harmony.dll, Vale-UI-Library.dll", ignored_mods);
 
     // Set path to managed folder dir as an env variable
     char *assembly_dir = mono_assembly_getrootdir();
@@ -87,73 +96,183 @@ void doorstop_invoke(void *domain) {
     SetEnvironmentVariableW(L"DOORSTOP_MANAGED_FOLDER_DIR", wide_assembly_dir);
     free(wide_assembly_dir);
 
-    const int len = WideCharToMultiByte(CP_UTF8, 0, config.target_assembly, -1, NULL, 0, NULL, NULL);
-    char *dll_path = malloc(sizeof(char) * len);
-    WideCharToMultiByte(CP_UTF8, 0, config.target_assembly, -1, dll_path, len, NULL, NULL);
-
     wchar_t *app_path = NULL;
     get_module_path(NULL, &app_path, NULL, 0);
     SetEnvironmentVariableW(L"DOORSTOP_PROCESS_PATH", app_path);
 
-    LOG("Loading assembly: %s\n", dll_path);
+    SetEnvironmentVariableW(L"INSLIM_DISPLAY_ALTERNATE", !config.show_alternate_menu ? L"false" : L"true");
+    LOG("Config Variables Set\n");
+
+    wchar_t bepinex_path[MAX_PATH];
+    memcpy(bepinex_path, BEPINEX_PATH, sizeof(BEPINEX_PATH));
+    memset(&bepinex_path[_countof(BEPINEX_PATH)], 0, sizeof(bepinex_path) - sizeof(BEPINEX_PATH));
+
+    DWORD length = GetFullPathNameW(bepinex_path, 0, NULL, NULL);
+    wchar_t* bepinex_full_path = malloc(sizeof(wchar_t) * length);
+    GetFullPathNameW(bepinex_path, length, bepinex_full_path, NULL);
+
+    const int len = WideCharToMultiByte(CP_UTF8, 0, bepinex_full_path, -1, NULL, 0, NULL, NULL);
+    char* dll_path = malloc(sizeof(char) * len);
+    WideCharToMultiByte(CP_UTF8, 0, bepinex_full_path, -1, dll_path, len, NULL, NULL);
+
+    LOG("\nChecking BepInEx Assembly: %s\n", dll_path);
     // Load our custom assembly into the domain
-    void *assembly = mono_domain_assembly_open(domain, dll_path);
+    void* assembly = mono_domain_assembly_open(domain, dll_path);
 
-    if (assembly == NULL)
-    LOG("Failed to load assembly\n");
+    if (assembly == NULL) {
+        LOG("BepInEx Not Installed - Skipping\n");
+        using_bepinex = FALSE;
+        if (config.show_modded_message)
+            MessageBoxW(HWND_MESSAGE, L"Modded Valheim Client Launching...\n     InSlimVML", L"InSlimVML v0.2.0", MB_SYSTEMMODAL);
+        SetEnvironmentVariableW(L"INSLIM_USING_BEPINEX", L"false");
+    } else {
+        // Set target assembly as an environment variable for use in the managed world
+        SetEnvironmentVariableW(L"DOORSTOP_INVOKE_DLL_PATH", L"BepInEx\\core\\BepInEx.Preloader.dll");
 
-    free(dll_path);
-    ASSERT_SOFT(assembly != NULL);
+        using_bepinex = TRUE;
+        LOG("Beginning BepInEx Loader...\n");
 
-    // Get assembly's image that contains CIL code
-    void *image = mono_assembly_get_image(assembly);
-    ASSERT_SOFT(image != NULL);
+        free(dll_path);
+        ASSERT_SOFT(assembly != NULL);
 
-    // Create a descriptor for a random Main method
-    void *desc = mono_method_desc_new("*:Main", FALSE);
+        // Get assembly's image that contains CIL code
+        void* image = mono_assembly_get_image(assembly);
+        ASSERT_SOFT(image != NULL);
 
-    // Find the first possible Main method in the assembly
-    void *method = mono_method_desc_search_in_image(desc, image);
-    ASSERT_SOFT(method != NULL);
+        // Create a descriptor for a random Main method
+        void* desc = mono_method_desc_new("*:Main", FALSE);
 
-    void *signature = mono_method_signature(method);
+        // Find the first possible Main method in the assembly
+        void* method = mono_method_desc_search_in_image(desc, image);
+        ASSERT_SOFT(method != NULL);
 
-    // Get the number of parameters in the signature
-    UINT32 params = mono_signature_get_param_count(signature);
+        void* signature = mono_method_signature(method);
 
-    void **args = NULL;
-    if (params == 1) {
-        // If there is a parameter, it's most likely a string[].
-        void *args_array = mono_array_new(domain, mono_get_string_class(), 0);
-        args = malloc(sizeof(void*) * 1);
-        args[0] = args_array;
+        // Get the number of parameters in the signature
+        UINT32 params = mono_signature_get_param_count(signature);
+
+        // Note: we use the runtime_invoke route since jit_exec will not work on DLLs
+        LOG("Invoking Entry Method %p\n", method);
+        void* exc = NULL;
+        mono_runtime_invoke(method, NULL, NULL, &exc);
+        if (exc != NULL) {
+            LOG("Error invoking code!\n");
+            if (mono_object_to_string)
+            {
+                void* str = mono_object_to_string(exc, NULL);
+                char* exc_str = mono_string_to_utf8(str);
+                LOG("Error message: %s\n", exc_str);
+            }
+        }
+        LOG("BepInEx Load Is Done!\n");
+
+        // cleanup method_desc
+        mono_method_desc_free(desc);
+        if (using_bepinex) {
+            if (config.show_modded_message)
+                MessageBoxW(NULL, L"Modded Valheim Client Launching...\n     InSlimVML + BepInEx", L"InSlimVML v0.2.0", MB_SYSTEMMODAL);
+            SetEnvironmentVariableW(L"INSLIM_USING_BEPINEX", L"true");
+        } else {
+            if (config.show_modded_message)
+                MessageBoxW(HWND_MESSAGE, L"Modded Valheim Client Launching...\n     InSlimVML", L"InSlimVML v0.2.0", MB_SYSTEMMODAL);
+            SetEnvironmentVariableW(L"INSLIM_USING_BEPINEX", L"false");
+        }
     }
 
-    // Note: we use the runtime_invoke route since jit_exec will not work on DLLs
-    LOG("Invoking method %p\n", method);
-    void *exc = NULL;
-    mono_runtime_invoke(method, NULL, args, &exc);
-    if (exc != NULL) {
-        LOG("Error invoking code!\n");
-    	if (mono_object_to_string)
-    	{
-            void* str = mono_object_to_string(exc, NULL);
-            char* exc_str = mono_string_to_utf8(str);
-            LOG("Error message: %s\n", exc_str);
-    	}
+    WIN32_FIND_DATAW ffd;
+    HANDLE hFind = FindFirstFileW(config.mod_folder_name, &ffd);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        LOG("\nBeginning InSlimVML Loader...!\n");
+        do {
+            if (check_ignored(ffd.cFileName, ignored_mods, ignored_mods_len) == TRUE) {
+                LOG("Ignoring mod: %s\n", ffd.cFileName);
+            } else {
+                wchar_t mod_path[MAX_PATH];
+                memcpy(mod_path, MOD_FOLDER, sizeof(MOD_FOLDER));
+                memset(&mod_path[_countof(MOD_FOLDER)], 0, sizeof(mod_path) - sizeof(MOD_FOLDER));
+
+                wchar_t *mod_path2 = lstrcatW(mod_path, ffd.cFileName);
+                DWORD length = GetFullPathNameW(mod_path2, 0, NULL, NULL);
+                wchar_t* mod_full_path = malloc(sizeof(wchar_t) * length);
+                GetFullPathNameW(mod_path2, length, mod_full_path, NULL);
+
+                const int len = WideCharToMultiByte(CP_UTF8, 0, mod_full_path, -1, NULL, 0, NULL, NULL);
+                char* dll_path = malloc(sizeof(char) * len);
+                WideCharToMultiByte(CP_UTF8, 0, mod_full_path, -1, dll_path, len, NULL, NULL);
+
+                LOG("Loading InSlim Assembly: %s\n", dll_path);
+                // Load our custom assembly into the domain
+                void* assembly = mono_domain_assembly_open(domain, dll_path);
+
+                if (assembly == NULL)
+                    LOG("Failed to load assembly\n");
+
+                free(dll_path);
+                ASSERT_SOFT(assembly != NULL);
+
+                // Get assembly's image that contains CIL code
+                void* image = mono_assembly_get_image(assembly);
+                ASSERT_SOFT(image != NULL);
+
+                // Create a descriptor for a random Main method
+                LOG("Entrypoint Attempt: %s\n", "*:Main");
+                void* desc = mono_method_desc_new("*:Main", FALSE);
+
+                // Find the first possible Main method in the assembly
+                void* method = mono_method_desc_search_in_image(desc, image);
+                if (method == NULL)
+                    LOG("Method Not Found: %p\n", method);
+                ASSERT_SOFT(method != NULL);
+
+                void* signature = mono_method_signature(method);
+
+                // Get the number of parameters in the signature
+                UINT32 params = mono_signature_get_param_count(signature);
+
+                void** args = NULL;
+                if (params == 1) {
+                    // If there is a parameter, it's most likely a string[].
+                    void* args_array = mono_array_new(domain, mono_get_string_class(), 0);
+                    args = malloc(sizeof(void*) * 1);
+                    args[0] = args_array;
+                }
+
+                // Note: we use the runtime_invoke route since jit_exec will not work on DLLs
+                LOG("Invoking method %p\n", method);
+                void* exc = NULL;
+                mono_runtime_invoke(method, NULL, args, &exc);
+                if (exc != NULL) {
+                    LOG("Error invoking code!\n");
+                    if (mono_object_to_string)
+                    {
+                        void* str = mono_object_to_string(exc, NULL);
+                        char* exc_str = mono_string_to_utf8(str);
+                        LOG("Error message: %s\n", exc_str);
+                    }
+                }
+
+                // cleanup method_desc
+                mono_method_desc_free(desc);
+
+                if (args != NULL) {
+                    free(args);
+                    args = NULL;
+                }
+
+                mods_loaded++;
+                VERBOSE_ONLY({
+                    DWORD length = GetFullPathNameW(ffd.cFileName, 0, NULL, NULL);
+                    wchar_t* mod_full_path = malloc(sizeof(wchar_t) * length);
+                    GetFullPathNameW(ffd.cFileName, length, mod_full_path, NULL);
+                    LOG("%s: InSlim Mod Loaded #%d\n", mod_full_path, mods_loaded);
+                    });
+            }
+        } while (FindNextFileW(hFind, &ffd) != 0);
+        LOG("\nInSlim Mods Loaded! [%d]\n", mods_loaded);
     }
-    LOG("Done!\n");
+    FindClose(hFind);
 
-    // cleanup method_desc
-    mono_method_desc_free(desc);
-
-    if (args != NULL) {
-        free(app_path);
-        free(args);
-        args = NULL;
-    }
-
-    cleanup_config();
+    free(app_path);
     free_logger();
 }
 
@@ -276,7 +395,7 @@ BOOL WINAPI DllEntry(HINSTANCE hInstDll, DWORD reasonForDllLoad, LPVOID reserved
 
     init_logger();
 
-    LOG("Doorstop started!\n");
+    LOG("InSlimVML started!\n");
 
     LOG("EXE Path: %S\n", app_path);
     LOG("App dir: %S\n", app_dir);
@@ -285,14 +404,6 @@ BOOL WINAPI DllEntry(HINSTANCE hInstDll, DWORD reasonForDllLoad, LPVOID reserved
     if (fixedCWD) { LOG("WARNING: Working directory is not the same as app directory! Fixing working directory!\n"); }
 
     stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    VERBOSE_ONLY({
-        LOG("STDOUT handle at %p\n", stdout_handle);
-        char handlepath[2046] = "\0";
-        GetFinalPathNameByHandleA(stdout_handle, handlepath, 2046, 0);
-        LOG("Pointer to GetFinalPathNameByHandleA %p\n", &GetFinalPathNameByHandleA);
-        LOG("STDOUT handle path: %s\n", handlepath);
-        });
 
     wchar_t *dll_path = NULL;
     const size_t dll_path_len = get_module_path(hInstDll, &dll_path, NULL, 0);
@@ -324,14 +435,9 @@ BOOL WINAPI DllEntry(HINSTANCE hInstDll, DWORD reasonForDllLoad, LPVOID reserved
         LOG("CMDLine: %S\n", new_cmdline_args);
     }
 
-    if (GetFileAttributesW(config.target_assembly) == INVALID_FILE_ATTRIBUTES) {
-        LOG("Could not find target assembly! Cannot enable!");
-        config.enabled = FALSE;
-    }
-
     // If the loader is disabled, don't inject anything.
     if (config.enabled) {
-        LOG("Doorstop enabled!\n");
+        LOG("InSlimVML enabled!\n");
 
         HMODULE target_module = GetModuleHandleA("UnityPlayer");
         const HMODULE app_module = GetModuleHandleA(NULL);
@@ -360,7 +466,7 @@ BOOL WINAPI DllEntry(HINSTANCE hInstDll, DWORD reasonForDllLoad, LPVOID reserved
         }
     }
     else {
-        LOG("Doorstop disabled! freeing resources\n");
+        LOG("InSlimVML disabled! freeing resources\n");
         free_logger();
     }
 

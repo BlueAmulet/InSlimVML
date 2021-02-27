@@ -32,10 +32,12 @@ inline void init_config_file() {
 
     wchar_t *config_path = get_full_path(CONFIG_NAME);
 
-    load_bool_file(config_path, L"UnityDoorstop", L"enabled", L"true", &config.enabled);
-    load_bool_file(config_path, L"UnityDoorstop", L"ignoreDisableSwitch", L"false", &config.ignore_disabled_env);
-    load_bool_file(config_path, L"UnityDoorstop", L"redirectOutputLog", L"false", &config.redirect_output_log);
-    load_path_file(config_path, L"UnityDoorstop", L"targetAssembly", DEFAULT_TARGET_ASSEMBLY, &config.target_assembly);
+    load_bool_file(config_path, L"InSlimVML", L"enabled", L"true", &config.enabled);
+    load_bool_file(config_path, L"InSlimVML", L"showModdedMessage", L"true", &config.show_modded_message);
+    load_bool_file(config_path, L"InSlimVML", L"showAlternateMenu", L"true", &config.show_alternate_menu);
+    load_bool_file(config_path, L"InSlimVML", L"ignoreDisableSwitch", L"false", &config.ignore_disabled_env);
+    load_bool_file(config_path, L"InSlimVML", L"redirectOutputLog", L"false", &config.redirect_output_log);
+    load_path_file(config_path, L"InSlimVML", L"modFolderName", L"InSlimVML\\Mods", &config.mod_folder_name);
 
     load_path_file(config_path, L"MonoBackend", L"runtimeLib", NULL, &config.mono_lib_dir);
     load_path_file(config_path, L"MonoBackend", L"configDir", NULL, &config.mono_config_dir);
@@ -81,8 +83,9 @@ inline void init_cmd_args() {
 
     for (int i = 0; i < argc; i++) {
         PARSE_ARG(L"--doorstop-enable", config.enabled, load_bool_argv);
+        PARSE_ARG(L"--modded-message-enable", config.show_modded_message, load_bool_argv);
         PARSE_ARG(L"--redirect-output-log", config.redirect_output_log, load_bool_argv);
-        PARSE_ARG(L"--doorstop-target", config.target_assembly, load_path_argv);
+        PARSE_ARG(L"--mod-folder-path", config.mod_folder_name, load_path_argv);
 
         PARSE_ARG(L"--mono-runtime-lib", config.mono_lib_dir, load_path_argv);
         PARSE_ARG(L"--mono-config-dir", config.mono_config_dir, load_path_argv);
@@ -108,7 +111,9 @@ void load_config() {
     config.mono_config_dir = NULL;
     config.mono_corlib_dir = NULL;
     config.mono_lib_dir = NULL;
-    config.target_assembly = NULL;
+    config.show_modded_message = TRUE;
+    config.show_alternate_menu = TRUE;
+    config.mod_folder_name = NULL;
 
     init_config_file();
     init_cmd_args();
@@ -120,7 +125,6 @@ void cleanup_config() {
     if ((val) != NULL)      \
         free(val)
 
-    FREE_NON_NULL(config.target_assembly);
     FREE_NON_NULL(config.mono_lib_dir);
     FREE_NON_NULL(config.mono_config_dir);
     FREE_NON_NULL(config.mono_corlib_dir);

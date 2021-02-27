@@ -7,7 +7,7 @@ HANDLE log_handle;
 char buffer[4096];
 
 inline void init_logger() {
-    wsprintfA(buffer, "doorstop_%lx.log", GetTickCount64());
+    wsprintfA(buffer, "InSlimVML\\devlog-inslim-%lx.log", GetTickCount64());
     log_handle = CreateFileA(buffer, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
                              NULL);
 }
@@ -37,7 +37,7 @@ inline void free_logger() {
 	{																				\
 		wchar_t *buff = (wchar_t*)malloc(sizeof(wchar_t) * 1024);					\
 		wsprintfW(buff, message, __VA_ARGS__);										\
-		MessageBox(NULL, buff, L"Doorstop: Fatal", MB_OK | MB_ICONERROR);			\
+		MessageBox(NULL, buff, L"InSlimVML: Fatal", MB_OK | MB_ICONERROR);			\
 		free(buff);																	\
 		ExitProcess(EXIT_FAILURE);													\
 	}
@@ -46,7 +46,7 @@ inline void free_logger() {
 #define ASSERT(test, message)                    \
 	if(!(test))                                  \
 	{                                            \
-		MessageBox(NULL, message, L"Doorstop: Fatal", MB_OK | MB_ICONERROR); \
+		MessageBox(NULL, message, L"InSlimVML: Fatal", MB_OK | MB_ICONERROR); \
 		ExitProcess(EXIT_FAILURE); \
 	}
 
