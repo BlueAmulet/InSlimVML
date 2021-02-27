@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28922.388
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoorstopTest", "DoorstopTest\DoorstopTest.csproj", "{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "proxy", "Proxy\Proxy.vcxproj", "{88609E16-731F-46C9-8139-6B1A7A83240D}"
 EndProject
 Global
@@ -23,30 +21,6 @@ Global
 		Verbose|x86 = Verbose|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Debug|x64.Build.0 = Debug|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Debug|x86.Build.0 = Debug|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Release|x64.ActiveCfg = Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Release|x64.Build.0 = Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Release|x86.ActiveCfg = Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Release|x86.Build.0 = Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose_Release|Any CPU.ActiveCfg = Verbose_Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose_Release|Any CPU.Build.0 = Verbose_Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose_Release|x64.ActiveCfg = Verbose_Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose_Release|x64.Build.0 = Verbose_Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose_Release|x86.ActiveCfg = Verbose_Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose_Release|x86.Build.0 = Verbose_Release|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose|Any CPU.ActiveCfg = Verbose|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose|Any CPU.Build.0 = Verbose|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose|x64.ActiveCfg = Verbose|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose|x64.Build.0 = Verbose|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose|x86.ActiveCfg = Verbose|Any CPU
-		{62B61CCC-0775-4CF4-B37A-EB5E33CBD08C}.Verbose|x86.Build.0 = Verbose|Any CPU
 		{88609E16-731F-46C9-8139-6B1A7A83240D}.Debug|Any CPU.ActiveCfg = Debug|Win32
 		{88609E16-731F-46C9-8139-6B1A7A83240D}.Debug|x64.ActiveCfg = Debug|x64
 		{88609E16-731F-46C9-8139-6B1A7A83240D}.Debug|x64.Build.0 = Debug|x64
